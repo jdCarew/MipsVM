@@ -35,6 +35,7 @@ int running=1;
 //prints the state of the VM registers
 void printReg()
 {
+	printf("pc: %08x\n",pc*4);
 	printf("$00: 0x%08x $01: 0x%08x $02: 0x%08x $03: 0x%08x\n",registers[0],registers[1], registers[2], registers[3]);
 	printf("$04: 0x%08x $05: 0x%08x $06: 0x%08x $07: 0x%08x\n",registers[4],registers[5], registers[6], registers[7]);
 	printf("$08: 0x%08x $09: 0x%08x $10: 0x%08x $11: 0x%08x\n",registers[8],registers[9], registers[10], registers[11]);
@@ -80,7 +81,6 @@ int main(int argc, char** argv)
 		instructions[n] += (unsigned int)c;
 		n++;
 	}
-	registers[31]=2^31;
 	while (running){
 		unsigned int s=s_mask(instructions[pc]);
         unsigned int t=t_mask(instructions[pc]);
@@ -94,16 +94,14 @@ int main(int argc, char** argv)
 		else if (bot_mask(instructions[pc]) == 0x22 && top_mask(instructions[pc])== 0){
 			//sub
             if (d!=0)
-				$d=$s-$t
+				$d=$s-$t;
 		}
 		else if (half_mask(instructions[pc]) == 0x18 && top_mask(instructions[pc]) == 0){
 			//mult
 		}
 		else if (half_mask(instructions[pc]) == 0x19 && top_mask(instructions[pc]) == 0){
 			//multu
-            d=d_mask(instructions[pc]);
-            s=s_mask(instructions[pc]);
-			unsigned long long ans = registers[s]*registers[t];
+			unsigned long long ans = $s * $t;
 			hi=(unsigned int)(ans>>32);
 			lo=(unsigned int)(ans &0xffffffff);
 		}
@@ -112,6 +110,8 @@ int main(int argc, char** argv)
 		}
 		else if (half_mask(instructions[pc]) == 0x1B && top_mask(instructions[pc]) == 0){
 			//divu
+			lo=$s / $t;
+			hi=$s % $t;
 		}
 		else if (bot_mask(instructions[pc]) == 0x10 && (instructions[pc] & 0xffff0000) == 0){
 			//mfhi
@@ -131,69 +131,53 @@ int main(int argc, char** argv)
 		}
 		else if (top_mask(instructions[pc]) == 0x2A){
 			//lw
-			s=s_mask(instructions[pc]);
-			t=t_mask(instructions[pc]);
 			i=half_mask(instructions[pc]);
-			registers[t]=stack[registers[s]+i];
+			$t=stack[$s+i];
 		}
         else if (top_mask(instructions[pc]) == 0x2B){
             //sw
-            s=s_mask(instructions[pc]);
-            t=t_mask(instructions[pc]);
-            i=half_mask(instructions[pc]);
-            stack[registers[s]+i]=registers[t];
+            stack[$s+i]=$t;
         }
         else if (bot_mask(instructions[pc]) == 0x2A && top_mask(instructions[pc]) == 0){
             //slt
-            d=d_mask(instructions[pc]);
-            s=s_mask(instructions[pc]);
-            t=t_mask(instructions[pc]);
-			if ((signed int)registers[s]< (signed int)registers[t]){
-				registers[d]=1;
+			if ((signed int)$s< (signed int)$t){
+				$d=1;
 			}else{
-				registers[d]=0;	
+				$d=0;	
 			}
         }
         else if (bot_mask(instructions[pc]) == 0x2B && top_mask(instructions[pc]) == 0){
             //sltu
-            d=d_mask(instructions[pc]);
-            s=s_mask(instructions[pc]);
-            t=t_mask(instructions[pc]);
-            if (registers[s]< registers[t]){
-                registers[d]=1;
+            if ($s< $t){
+                $d=1;
             }else{
-                registers[d]=0;
+                $d=0;
             }
 
         }
         else if (top_mask(instructions[pc]) == 0x4){
             //beq
-            s=s_mask(instructions[pc]);
-            t=t_mask(instructions[pc]);
-            i=half_mask(instructions[pc]);
-			if (registers[s] == registers[t]){
+			if ($s == $t){
 				pc+=i;//not that this is not multiplied by 4 because my pc is only incrementing by 1
 			}
         }
         else if (top_mask(instructions[pc]) == 0x5){
             //bne
-            s=s_mask(instructions[pc]);
-            t=t_mask(instructions[pc]);
-            i=half_mask(instructions[pc]);
-            if (registers[s] != registers[t]){
+            if ($s != $t){
                 pc+=i;//not that this is not multiplied by 4 because my pc is only incrementing by 1
             }
         }
         else if ((instructions[pc] & 0x1fffff) == 0x8 && top_mask(instructions[pc]) == 0){
             //jr
-			s=s_mask(instructions[pc]);
-			pc = registers[s]/4;
+			pc = $s/4;
+			if (pc == 0){
+				running=0;
+			}
         }
         else if ((instructions[pc] & 0x1fffff) == 0x9 && top_mask(instructions[pc]) == 0){
             //jalr
-			s=s_mask(instructions[pc]);
-			unsigned int temp=registers[s];
-			registers[31]=pc;
+			unsigned int temp=$s;
+			registers[31]=pc*4;
 			pc=temp;
         }
 		pc++;
