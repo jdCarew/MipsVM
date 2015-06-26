@@ -58,8 +58,14 @@ void printStack()
 int main(int argc, char** argv)
 {
 	if (argc <2){
-		printf("usage: MipsVM source\n source must be a mips binary file\n");
+		printf("usage: MipsVM source [$2] [$3]\n source must be a mips binary file\n optionally inlclude start values for 3 and 2");
 		return 0;
+	}
+	if (argc >2){
+		registers[1]=atoi(argv[2]);
+	}
+	if (argc >3){
+		registers[2]=atoi(argv[3]);
 	}
 	FILE * file = fopen(argv[1], "rb");
 	if (file ==NULL)
@@ -76,7 +82,7 @@ int main(int argc, char** argv)
 		c=fgetc(file);
 		instructions[n] += (unsigned int)c <<16;
 		c=fgetc(file);
-		instructions[n] += (unsigned int)c <<4;
+		instructions[n] += (unsigned int)c <<8;
 		c=fgetc(file);
 		instructions[n] += (unsigned int)c;
 		n++;
