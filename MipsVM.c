@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 #define s_mask(instr) ((instr >> 21) & 0x1f)
 #define t_mask(instr) ((instr >> 16) & 0x1f)
@@ -25,12 +26,12 @@
 
 static int stack[STACK_SIZE]; //contains the stack, starting at the bottom and building up?
 
-unsigned int registers[32]; //contains the register states
-unsigned int hi;
-unsigned int lo;
-unsigned int pc;//program counter, will point to next instruction
-unsigned int *instructions; //contains the current instruction
-int running=1;
+uint32_t registers[32]; //contains the register states
+uint32_t hi;
+uint32_t lo;
+uint32_t pc;//program counter, will point to next instruction
+uint32_t *instructions; //contains the current instruction
+uint32_t running=1;
 
 //prints the state of the VM registers
 void printReg()
@@ -44,6 +45,7 @@ void printReg()
 	printf("$20: 0x%08x $21: 0x%08x $22: 0x%08x $23: 0x%08x\n",registers[20],registers[21], registers[22], registers[23]);
 	printf("$24: 0x%08x $25: 0x%08x $26: 0x%08x $27: 0x%08x\n",registers[24],registers[25], registers[26], registers[27]);
 	printf("$28: 0x%08x $29: 0x%08x $30: 0x%08x $31: 0x%08x\n",registers[28],registers[29], registers[30], registers[31]);
+	printf("Hi: 0x%08x Lo: 0x%08x\n", hi, lo);
 }
 
 //prints the state of the VM stack
@@ -58,14 +60,14 @@ void printStack()
 int main(int argc, char** argv)
 {
 	if (argc <2){
-		printf("usage: MipsVM source [$2] [$3]\n source must be a mips binary file\n optionally inlclude start values for 3 and 2");
+		printf("usage: MipsVM source [$2] [$3]\n source must be a mips binary file\n optionally inlclude start values for 3 and 2\n");
 		return 0;
 	}
 	if (argc >2){
-		registers[1]=atoi(argv[2]);
+		registers[2]=atoi(argv[2]);
 	}
 	if (argc >3){
-		registers[2]=atoi(argv[3]);
+		registers[3]=atoi(argv[3]);
 	}
 	FILE * file = fopen(argv[1], "rb");
 	if (file ==NULL)
@@ -75,23 +77,23 @@ int main(int argc, char** argv)
 	size_t instructionCount=ftell(file)/4;
 	fseek(file, 0L, SEEK_SET);
 	size_t n=0;
-	int c;
+	uint32_t c;
 	instructions=malloc(instructionCount);
 	while ((c = fgetc(file)) != EOF){
-		instructions[n] = (unsigned int)c <<24;
+		instructions[n] = (uint32_t)c <<24;
 		c=fgetc(file);
-		instructions[n] += (unsigned int)c <<16;
+		instructions[n] += (uint32_t)c <<16;
 		c=fgetc(file);
-		instructions[n] += (unsigned int)c <<8;
+		instructions[n] += (uint32_t)c <<8;
 		c=fgetc(file);
-		instructions[n] += (unsigned int)c;
+		instructions[n] += (uint32_t)c;
 		n++;
 	}
 	while (running){
-		unsigned int s=s_mask(instructions[pc]);
-        unsigned int t=t_mask(instructions[pc]);
-        unsigned int d=d_mask(instructions[pc]);
-        unsigned int i=half_mask(instructions[pc]);
+		uint32_t s=s_mask(instructions[pc]);
+        uint32_t t=t_mask(instructions[pc]);
+        uint32_t d=d_mask(instructions[pc]);
+        uint32_t i=half_mask(instructions[pc]);
 		if (bot_mask(instructions[pc]) == 0x20 && top_mask(instructions[pc]) == 0){
 			//add
 			if (d!=0)
@@ -104,15 +106,20 @@ int main(int argc, char** argv)
 		}
 		else if (half_mask(instructions[pc]) == 0x18 && top_mask(instructions[pc]) == 0){
 			//mult
+			int64_t ans = (int32_t) $s * (int32_t) $t;
+			hi = (uint32_t)(ans>>32);
+			lo = (uint32_t)(ans & 0xffffffff);
 		}
 		else if (half_mask(instructions[pc]) == 0x19 && top_mask(instructions[pc]) == 0){
 			//multu
-			unsigned long long ans = $s * $t;
-			hi=(unsigned int)(ans>>32);
-			lo=(unsigned int)(ans &0xffffffff);
+			uint64_t ans = $s * $t;
+			hi=(uint32_t)(ans>>32);
+			lo=(uint32_t)(ans &0xffffffff);
 		}
 		else if (half_mask(instructions[pc]) == 0x1A && top_mask(instructions[pc]) == 0){
 			//div
+			lo=(uint32_t) ((int32_t)$s / (int32_t)$t);
+			hi=(uint32_t) ((int32_t)$s % (int32_t)$t);
 		}
 		else if (half_mask(instructions[pc]) == 0x1B && top_mask(instructions[pc]) == 0){
 			//divu
@@ -146,7 +153,7 @@ int main(int argc, char** argv)
         }
         else if (bot_mask(instructions[pc]) == 0x2A && top_mask(instructions[pc]) == 0){
             //slt
-			if ((signed int)$s< (signed int)$t){
+			if ((int32_t)$s< (int32_t)$t){
 				$d=1;
 			}else{
 				$d=0;	
@@ -182,7 +189,7 @@ int main(int argc, char** argv)
         }
         else if ((instructions[pc] & 0x1fffff) == 0x9 && top_mask(instructions[pc]) == 0){
             //jalr
-			unsigned int temp=$s;
+			uint32_t temp=$s;
 			registers[31]=pc*4;
 			pc=temp;
         }
